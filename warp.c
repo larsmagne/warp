@@ -40,6 +40,7 @@ char *read_elem(char **buffer) {
 }
 
 GHashTable* subject_table;
+GHashTable* message_id_table;
 
 char *clean_subject(char *subject) {
   char *string, *last;
@@ -78,8 +79,17 @@ char *clean_from(char *from) {
 }
 
 int parse_date(char *date) {
-  return 0;
+  return g_mime_utils_header_decode_date(date, 0);
 }
+
+typedef struct {
+  char *from;
+  char *subject;
+  char *message_id;
+  int number;
+  int time;
+  struct article *next;
+} article;
 
 char *thread_line(char *buffer) {
   int number = atoi(read_elem(&buffer));
@@ -88,7 +98,10 @@ char *thread_line(char *buffer) {
   int time = parse_date(read_elem(&buffer));
   char *message_id = read_elem(&buffer);
   char *references = read_elem(&buffer);
-
+  article *art = calloc(1, sizeof(article));
+  article *parent = NULL;
+  char *ref;
+  
   while (*buffer != '\n' &&
 	 *buffer != 0)
     buffer++;
@@ -96,10 +109,44 @@ char *thread_line(char *buffer) {
   if (*buffer)
     buffer++;
 
+  if (g_hash_table_lookup(message_id_table, message_id) != NULL) {
+    printf("Seen article %s before\n", message_id);
+    return buffer;
+  }
 
-  g_hash_table_insert(subject_table, "Virginia", "Richmond");
+  ref = references + strlen(references);
+  while (ref > references) {
+    while (ref > references &&
+	   *ref != ' ')
+      ref--;
+    if (ref - 1 > references)
+      *(ref - 1) = 0;
+    parent = (article*)g_hash_table_lookup(message_id_table, ref);
+    if (parent) {
+      printf("%s is parent of %s\n",
+	     parent->message_id, ref);
+    }
+  }
 
-  printf("%s\n", from);
+  if (! parent)
+    parent = (article*)g_hash_table_lookup(subject_table, subject);
+
+  if (! parent) {
+    g_hash_table_insert(subject_table, subject, (gpointer)art);
+    g_hash_table_insert(message_id_table, message_id, (gpointer)art);
+  } else {
+    // If there is a parent, then just add this one to the last entry
+    // in the list.
+    while (parent->next)
+      parent = parent->next;
+    parent->next = art;
+  }
+
+  art->number = number;
+  art->subject = subject;
+  art->from = from;
+  art->time = time;
+  art->message_id = message_id;
   
   return buffer;
 }
@@ -141,6 +188,7 @@ int main(int argc, char **argv) {
   }
 
   subject_table = g_hash_table_new(g_str_hash, g_str_equal);
+  message_id_table = g_hash_table_new(g_str_hash, g_str_equal);
   
   thread_file(nov, output);
 
