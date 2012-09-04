@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <glib.h>
+#include <gmime/gmime.h>
 
 char *read_file(int fd) {
   struct stat buf;
@@ -37,8 +39,55 @@ char *read_elem(char **buffer) {
   return elem;
 }
 
+GHashTable* subject_table;
+
+char *clean_subject(char *subject) {
+  char *string, *last;
+  
+  while (*subject == '\t' || *subject == '\n' || *subject == ' ')
+    subject++;
+
+  string = subject;
+  last = subject;
+  while (*string) {
+    if (*string != '\t' && *string != '\n' && *string != ' ')
+      last = string + 1;
+    string++;
+  }
+  *last = 0;
+  return subject;
+}
+
+char *clean_from(char *from) {
+  InternetAddress *iaddr;
+  InternetAddressList *iaddr_list;
+
+  if ((iaddr_list = internet_address_list_parse_string(from)) != NULL) {
+    iaddr = internet_address_list_get_address(iaddr_list, 0);
+    if (iaddr->name != NULL) {
+      strcpy(from, iaddr->name);
+      
+      /* There's a bug in gmimelib that may leave a closing paren in
+	 the name field. */
+      if (strrchr(from, ')') == from + strlen(from) - 1) 
+	*strrchr(from, ')') = 0;
+    }
+    g_object_unref(iaddr_list);
+  }
+  return from;
+}
+
+int parse_date(char *date) {
+  return 0;
+}
+
 char *thread_line(char *buffer) {
-  char *number = read_elem(&buffer);
+  int number = atoi(read_elem(&buffer));
+  char *subject = clean_subject(read_elem(&buffer));
+  char *from = clean_from(read_elem(&buffer));
+  int time = parse_date(read_elem(&buffer));
+  char *message_id = read_elem(&buffer);
+  char *references = read_elem(&buffer);
 
   while (*buffer != '\n' &&
 	 *buffer != 0)
@@ -47,7 +96,11 @@ char *thread_line(char *buffer) {
   if (*buffer)
     buffer++;
 
-  //printf("%s\n", number);
+
+  g_hash_table_insert(subject_table, "Virginia", "Richmond");
+
+  printf("%s\n", from);
+  
   return buffer;
 }
 
@@ -61,6 +114,9 @@ void thread_file(int nov, int output) {
 int main(int argc, char **argv) {
   int nov, output;
   char *output_name, *tmp_name;
+
+  g_type_init();
+  g_mime_init(0);
   
   if (argc != 3) {
     printf("Usage: warp <nov-file> <output-file>\n");
@@ -84,6 +140,8 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
+  subject_table = g_hash_table_new(g_str_hash, g_str_equal);
+  
   thread_file(nov, output);
 
   close(output);
