@@ -9,12 +9,57 @@
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
 
-void thread_file(FILE *nov, FILE *output) {
+char *read_file(int fd) {
+  struct stat buf;
+  char *buffer;
+
+  fstat(fd, &buf);
+  buffer = calloc(buf.st_size + 1, 1);
+  if (read(fd, buffer, buf.st_size) < buf.st_size) {
+    perror("Read error");
+    exit(-1);
+  }
+
+  return buffer;
+}
+
+char *read_elem(char **buffer) {
+  char *elem = *buffer;
+  while (**buffer != '\n' &&
+	 **buffer != '\t' &&
+	 **buffer != 0)
+    *buffer = *buffer + 1;
+  // End the elem by turning the TAB into a zero.
+  **buffer = 0;
+  *buffer = *buffer + 1;
+  return elem;
+}
+
+char *thread_line(char *buffer) {
+  char *number = read_elem(&buffer);
+
+  while (*buffer != '\n' &&
+	 *buffer != 0)
+    buffer++;
+
+  if (*buffer)
+    buffer++;
+
+  //printf("%s\n", number);
+  return buffer;
+}
+
+void thread_file(int nov, int output) {
+  char *buffer = read_file(nov);
+
+  while (*buffer)
+    buffer = thread_line(buffer);
 }
 
 int main(int argc, char **argv) {
-  FILE *nov, *output;
+  int nov, output;
   char *output_name, *tmp_name;
   
   if (argc != 3) {
@@ -22,8 +67,8 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  nov = fopen(argv[1], "r");
-  if (! nov) {
+  nov = open(argv[1], O_RDONLY);
+  if (nov < 0) {
     perror("Opening NOV file");
     exit(-1);
   }
@@ -33,7 +78,7 @@ int main(int argc, char **argv) {
   strcpy(tmp_name, output_name);
   strcat(tmp_name, ".tmp");
 
-  output = fopen(tmp_name, "w");
+  output = open(tmp_name, O_WRONLY);
   if (! output) {
     perror("Opening output file");
     exit(-1);
@@ -41,7 +86,7 @@ int main(int argc, char **argv) {
 
   thread_file(nov, output);
 
-  fclose(output);
+  close(output);
   rename(tmp_name, output_name);
   
   return 0;
