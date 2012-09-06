@@ -45,6 +45,7 @@ char *clean_subject(char *subject) {
 
   string = subject;
   last = subject;
+  // Find the last non-blank character.
   while (*string) {
     if (*string != '\t' && *string != '\n' && *string != ' ')
       last = string + 1;
