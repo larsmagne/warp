@@ -15,6 +15,7 @@
 #include <ctype.h>
 
 void output_content(FILE *output, char *content) {
+  fprintf(output, "%s", content);
 }
 
 char *convert_to_utf8(const char *string, const char *charset) {
@@ -35,7 +36,6 @@ char *convert_to_utf8(const char *string, const char *charset) {
 
 void transform_simple_part(FILE *output, GMimePart* part) {
   GMimeContentType* ct = 0;
-  gchar* content = 0;
   unsigned long contentLen = 0;
   char content_type[128];
   char *mcontent, *p, *ccontent = NULL;
@@ -63,12 +63,11 @@ void transform_simple_part(FILE *output, GMimePart* part) {
     *p = tolower(*p);
 
   /* We copy over the content and zero-terminate it. */
-  mcontent = malloc(contentLen + 1);
   wrapper = g_mime_part_get_content_object(part);
   stream = g_mime_data_wrapper_get_stream(wrapper);
-  g_mime_stream_read(stream, content, contentLen);
-  memcpy(mcontent, content, contentLen);
-  *(mcontent + contentLen) = 0;
+  contentLen = g_mime_stream_length(stream);
+  mcontent = malloc(contentLen + 1);
+  g_mime_stream_read(stream, mcontent, contentLen);
   use_content = mcontent;
 
   /* Convert contents to utf-8.  If the conversion wasn't successful,
