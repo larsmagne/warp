@@ -6,6 +6,30 @@
 #include <fcntl.h>
 #include <gmime/gmime.h>
 
+#define ROOTS_PER_PAGE 30
+
+typedef struct article article;
+
+struct article {
+  char *from;
+  char *subject;
+  char *message_id;
+  int number;
+  int time;
+  struct article *next_article;
+  struct article *next_root;
+  int offset;
+};
+
+article *first_root = NULL;
+article *next_root = NULL;
+int last_article = 0;
+int number_of_roots = 0;
+
+GHashTable* subject_table;
+GHashTable* message_id_table;
+
+
 char *read_file(int fd) {
   struct stat buf;
   char *buffer;
@@ -33,9 +57,6 @@ char *read_elem(char **buffer) {
   *buffer = *buffer + 1;
   return elem;
 }
-
-GHashTable* subject_table;
-GHashTable* message_id_table;
 
 char *clean_subject(char *subject) {
   char *string, *last;
@@ -72,17 +93,6 @@ int parse_date(char *date) {
   return g_mime_utils_header_decode_date(date, 0);
 }
 
-typedef struct article article;
-
-struct article {
-  char *from;
-  char *subject;
-  char *message_id;
-  int number;
-  int time;
-  struct article *next;
-};
-
 char *thread_line(char *buffer) {
   int number = atoi(read_elem(&buffer));
   char *subject = clean_subject(read_elem(&buffer));
@@ -114,24 +124,6 @@ char *thread_line(char *buffer) {
     if (ref - 1 > references)
       *(ref - 1) = 0;
     parent = (article*)g_hash_table_lookup(message_id_table, ref);
-    if (parent) {
-      printf("%s is parent of %s\n",
-	     parent->message_id, ref);
-    }
-  }
-
-  if (! parent)
-    parent = (article*)g_hash_table_lookup(subject_table, subject);
-
-  if (! parent) {
-    g_hash_table_insert(subject_table, subject, (gpointer)art);
-    g_hash_table_insert(message_id_table, message_id, (gpointer)art);
-  } else {
-    // If there is a parent, then just add this one to the last entry
-    // in the list.
-    while (parent->next)
-      parent = parent->next;
-    parent->next = art;
   }
 
   art->number = number;
@@ -139,7 +131,30 @@ char *thread_line(char *buffer) {
   art->from = from;
   art->time = time;
   art->message_id = message_id;
+
+  last_article = number;
   
+  if (! parent)
+    parent = (article*)g_hash_table_lookup(subject_table, subject);
+
+  if (! parent) {
+    g_hash_table_insert(subject_table, subject, (gpointer)art);
+    g_hash_table_insert(message_id_table, message_id, (gpointer)art);
+    if (! first_root)
+      first_root = art;
+    else
+      next_root->next_root = art;
+      next_root = art;
+    next_root = art;
+    number_of_roots++;
+  } else {
+    // If there is a parent, then just add this one to the last entry
+    // in the list.
+    while (parent->next_article)
+      parent = parent->next_article;
+    parent->next_article = art;
+  }
+
   return buffer;
 }
 
@@ -148,6 +163,63 @@ void thread_file(int nov, int output) {
 
   while (*buffer)
     buffer = thread_line(buffer);
+}
+
+int data_size() {
+  article *art = first_root, *a;
+  int size = 0;
+  
+  while (art) {
+    // Record the start point of each thread.
+    art->offset = size;
+    size += strlen(art->from) +
+      strlen(art->subject) +
+      2 +
+      sizeof(art->time);
+    a = art;
+    // We need to store all the article numbers for the thread.
+    do {
+      size += sizeof(int);
+      a = a->next_article;
+    } while (a);
+    art = art->next_root;
+  }
+
+  return size;
+}
+
+void write_data(int output) {
+  int index_size = sizeof(int) * (2 + last_article +
+				  number_of_roots / ROOTS_PER_PAGE);
+  int total_size = index_size + data_size();
+  int *index = calloc(total_size, 1);
+  article *art = first_root;
+  int i, j;
+
+  printf("writing\n");
+  *index = number_of_roots;
+  *(index + 1) = last_article;
+
+  // Write the index that maps from article numbers to thread roots.
+  for (i = 0; i < last_article; i++) {
+    if (art->number == i) {
+      *(index + 2 + i) = index_size + art->offset;
+      art = art->next_root;
+    }
+  }
+
+  // Write the index that maps from overview page to thread roots.
+  art = first_root;
+  for (i = 0; i < number_of_roots / ROOTS_PER_PAGE; i++) {
+    *(index + 2 + last_article + i) = index_size + art->offset;
+    for (j = 0; j < ROOTS_PER_PAGE && art; j++) 
+      art = art->next_root;
+  }
+
+  if (write(output, index, total_size) < total_size) {
+    perror("Writing index");
+  }
+  free(index);
 }
 
 int main(int argc, char **argv) {
@@ -181,9 +253,13 @@ int main(int argc, char **argv) {
 
   subject_table = g_hash_table_new(g_str_hash, g_str_equal);
   message_id_table = g_hash_table_new(g_str_hash, g_str_equal);
-  
+
+  // Read all the NOV data and create all the structures.
   thread_file(nov, output);
 
+  // Write out the index data and the root data to the file.
+  write_data(output);
+  
   close(output);
   rename(tmp_name, output_name);
   
