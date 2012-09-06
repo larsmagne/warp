@@ -20,6 +20,8 @@ char *read_file(int fd) {
   return buffer;
 }
 
+// Returns the next NOV elem, but also advances the buffer pointer to
+// the start of the next element.
 char *read_elem(char **buffer) {
   char *elem = *buffer;
   while (**buffer != '\n' &&
