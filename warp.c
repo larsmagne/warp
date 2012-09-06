@@ -196,7 +196,6 @@ void write_data(int output) {
   article *art = first_root;
   int i, j;
 
-  printf("writing\n");
   *index = number_of_roots;
   *(index + 1) = last_article;
 
@@ -245,8 +244,8 @@ int main(int argc, char **argv) {
   strcpy(tmp_name, output_name);
   strcat(tmp_name, ".tmp");
 
-  output = open(tmp_name, O_WRONLY);
-  if (! output) {
+  output = open(tmp_name, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+  if (output < 0) {
     perror("Opening output file");
     exit(-1);
   }
