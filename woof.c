@@ -227,8 +227,17 @@ void read_file(FILE *output, int input) {
   transform_part(output,  msg->mime_part); 
 
   archive = (char*)g_mime_object_get_header((GMimeObject*)msg, "Archived-at");
-  if (archive)
+  if (archive) {
+    char *final;
+    while (*archive &&
+	   (*archive == '<' ||
+	    *archive == ' '))
+      archive++;
+    final = strrchr(archive, '>');
+    if (final)
+      *final = 0;
     fprintf(output, "<a href=\"%s\">Read more</a>\n", archive);
+  }
   
   g_object_unref(stream);
 }
