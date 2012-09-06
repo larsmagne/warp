@@ -88,7 +88,7 @@ void transform_simple_part(FILE *output, GMimePart* part) {
   }
 
   if (charset == NULL)
-    charset = "utf-8";
+    charset = "iso-8859-1";
 
   for (p = content_type; *p; p++) 
     *p = tolower(*p);
@@ -177,13 +177,11 @@ void transform_multipart(FILE *output, GMimeMultipart *mime_part) {
   }
 }
 
-void transform_message(FILE *output, GMimeMessage *msg);
-
 void transform_part(FILE *output, GMimeObject *mime_part) {
   if (GMIME_IS_MESSAGE_PART(mime_part)) {
     GMimeMessagePart *msgpart = GMIME_MESSAGE_PART(mime_part);
     GMimeMessage *msg = g_mime_message_part_get_message(msgpart);
-    transform_message(output, msg);
+    transform_part(output,  msg->mime_part); 
     g_object_unref(msg);
   } else if (GMIME_IS_MULTIPART(mime_part)) {
     transform_multipart(output, GMIME_MULTIPART(mime_part)); 
@@ -209,10 +207,6 @@ char *clean_from(char *from) {
     g_object_unref(iaddr_list);
   }
   return from;
-}
-
-void transform_message(FILE *output, GMimeMessage *msg) {
-  transform_part(output,  msg->mime_part); 
 }
 
 void read_file(FILE *output, int input) {
