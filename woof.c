@@ -13,8 +13,12 @@
 #include <glib.h>
 #include <gmime/gmime.h>
 
+void output_file(int output, char **inputs) {
+}
+
 int main(int argc, char **argv) {
-  char *output_name;
+  char *output_name, *tmp_name;
+  int output;
   
   g_type_init();
   g_mime_init(0);
