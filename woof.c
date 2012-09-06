@@ -14,8 +14,39 @@
 #include <gmime/gmime.h>
 #include <ctype.h>
 
-void output_content(FILE *output, char *content) {
-  fprintf(output, "%s", content);
+void output_plain_content(FILE *output, char *content) {
+  int length = 100;
+  int c;
+  
+  while ((c = *content) && length-- > 0) {
+    if (c == '<')
+      fprintf(output, "&lt;");
+    else if (c == '>')
+      fprintf(output, "&gt;");
+    else if (c == '&')
+      fprintf(output, "&amp;");
+    else
+      fprintf(output, "%c", c);
+  }
+}
+
+void output_html_content(FILE *output, char *content) {
+  int length = 100;
+  char *end = content;
+
+  while (length > 0 &&
+	 *end) {
+    while (*end && *end != '<')
+      end++;
+    *end++ = 0;
+    if (end - content > length)
+      *(content + length) = 0;
+    fprintf(output, "%s", content);
+    length -= end - content;
+    while (*end && *end != '>')
+      end++;
+    end = content = end + 1;
+  }
 }
 
 char *convert_to_utf8(const char *string, const char *charset) {
@@ -78,8 +109,14 @@ void transform_simple_part(FILE *output, GMimePart* part) {
       use_content = ccontent;
   }
 
-  output_content(output, use_content);
-  
+  fprintf(output, "<div class=body>");
+  if (! strcmp(content_type, "text/html"))
+    output_html_content(output, use_content);
+  else
+    output_plain_content(output, use_content);
+  fprintf(output, "...\n");
+  fprintf(output, "</div>\n");
+
   free(mcontent);
   if (ccontent != NULL)
     free(ccontent);
@@ -133,13 +170,10 @@ void transform_multipart(FILE *output, GMimeMultipart *mime_part) {
       child = g_mime_multipart_get_part(mime_part, number_of_children);
 
     transform_part(output, preferred);
-
   } else {
     /* Multipart mixed and related. */
-    while (nchild < number_of_children) {
-      child = g_mime_multipart_get_part(mime_part, nchild++);
-      transform_part(output, child);
-    }
+    if (number_of_children > 1)
+      transform_part(output, g_mime_multipart_get_part(mime_part, 0));
   }
 }
 
@@ -186,7 +220,7 @@ void read_file(FILE *output, int input) {
   GMimeMessage *msg;
   time_t time;
   int tz;
-  char *from;
+  char *from, *archive;
   
   stream = g_mime_stream_fs_new(input);
   msg = g_mime_parser_construct_message(g_mime_parser_new_with_stream(stream));
@@ -194,10 +228,14 @@ void read_file(FILE *output, int input) {
   g_mime_message_get_date(msg, &time, &tz);
   from = clean_from((char*)g_mime_object_get_header((GMimeObject*)msg, "From"));
 
-  fprintf(output, "<span class=from>%s</span>", from);
+  fprintf(output, "<span class=from>%s</span>\n", from);
   
   transform_part(output,  msg->mime_part); 
 
+  archive = (char*)g_mime_object_get_header((GMimeObject*)msg, "Archived-at");
+  if (archive)
+    fprintf(output, "<a href=\"%s\">Read more</a>\n", archive);
+  
   g_object_unref(stream);
 }
 
