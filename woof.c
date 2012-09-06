@@ -14,9 +14,12 @@
 #include <gmime/gmime.h>
 #include <ctype.h>
 
-void output_plain_content(FILE *output, char *content) {
+void output_plain_content(FILE *output, char *content, int shortenp) {
   int length = 100;
   int c;
+
+  if (! shortenp)
+    length = strlen(content);
   
   while ((c = *content) && length-- > 0) {
     if (c == '<')
@@ -30,9 +33,12 @@ void output_plain_content(FILE *output, char *content) {
   }
 }
 
-void output_html_content(FILE *output, char *content) {
+void output_html_content(FILE *output, char *content, int shortenp) {
   int length = 100;
   char *end = content;
+
+  if (! shortenp)
+    length = strlen(content);
 
   while (length > 0 &&
 	 *end) {
@@ -65,7 +71,7 @@ char *convert_to_utf8(const char *string, const char *charset) {
   return result;
 }
 
-void transform_simple_part(FILE *output, GMimePart* part) {
+void transform_simple_part(FILE *output, GMimePart* part, int shortenp) {
   GMimeContentType* ct = 0;
   unsigned long contentLen = 0;
   char content_type[128];
@@ -111,9 +117,9 @@ void transform_simple_part(FILE *output, GMimePart* part) {
 
   fprintf(output, "<div class=body>");
   if (! strcmp(content_type, "text/html"))
-    output_html_content(output, use_content);
+    output_html_content(output, use_content, shortenp);
   else
-    output_plain_content(output, use_content);
+    output_plain_content(output, use_content, shortenp);
   fprintf(output, "...\n");
   fprintf(output, "</div>\n");
 
@@ -122,9 +128,10 @@ void transform_simple_part(FILE *output, GMimePart* part) {
     free(ccontent);
 }
 
-void transform_part(FILE *output, GMimeObject *mime_part);
+void transform_part(FILE *output, GMimeObject *mime_part, int shortenp);
 
-void transform_multipart(FILE *output, GMimeMultipart *mime_part) {
+void transform_multipart(FILE *output, GMimeMultipart *mime_part,
+			 int shortenp) {
   const GMimeContentType* ct = NULL;
   GMimeObject *child;
   GMimeObject *preferred = NULL;
@@ -169,24 +176,24 @@ void transform_multipart(FILE *output, GMimeMultipart *mime_part) {
       /* Use the last child as the preferred. */
       child = g_mime_multipart_get_part(mime_part, number_of_children);
 
-    transform_part(output, preferred);
+    transform_part(output, preferred, shortenp);
   } else {
     /* Multipart mixed and related. */
     if (number_of_children > 1)
-      transform_part(output, g_mime_multipart_get_part(mime_part, 0));
+      transform_part(output, g_mime_multipart_get_part(mime_part, 0), shortenp);
   }
 }
 
-void transform_part(FILE *output, GMimeObject *mime_part) {
+void transform_part(FILE *output, GMimeObject *mime_part, int shortenp) {
   if (GMIME_IS_MESSAGE_PART(mime_part)) {
     GMimeMessagePart *msgpart = GMIME_MESSAGE_PART(mime_part);
     GMimeMessage *msg = g_mime_message_part_get_message(msgpart);
-    transform_part(output,  msg->mime_part); 
+    transform_part(output,  msg->mime_part, shortenp);
     g_object_unref(msg);
   } else if (GMIME_IS_MULTIPART(mime_part)) {
-    transform_multipart(output, GMIME_MULTIPART(mime_part)); 
+    transform_multipart(output, GMIME_MULTIPART(mime_part), shortenp); 
   } else {
-    transform_simple_part(output, GMIME_PART(mime_part));
+    transform_simple_part(output, GMIME_PART(mime_part), shortenp);
   }
 }
 
@@ -221,12 +228,12 @@ void read_file(FILE *output, int input) {
 
   g_mime_message_get_date(msg, &time, &tz);
   from = clean_from((char*)g_mime_object_get_header((GMimeObject*)msg, "From"));
+  archive = (char*)g_mime_object_get_header((GMimeObject*)msg, "Archived-at");
 
   fprintf(output, "<span class=from>%s</span>\n", from);
   
-  transform_part(output,  msg->mime_part); 
+  transform_part(output, msg->mime_part, archive? 1: 0); 
 
-  archive = (char*)g_mime_object_get_header((GMimeObject*)msg, "Archived-at");
   if (archive) {
     char *final;
     while (*archive &&
