@@ -238,7 +238,7 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  read_files(output, argv + 3);
+  read_files(output, argv + 2);
 
   fclose(output);
   rename(tmp_name, output_name);
