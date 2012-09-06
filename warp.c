@@ -82,14 +82,16 @@ int parse_date(char *date) {
   return g_mime_utils_header_decode_date(date, 0);
 }
 
-typedef struct {
+typedef struct article article;
+
+struct article {
   char *from;
   char *subject;
   char *message_id;
   int number;
   int time;
   struct article *next;
-} article;
+};
 
 char *thread_line(char *buffer) {
   int number = atoi(read_elem(&buffer));
