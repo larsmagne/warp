@@ -3,14 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <signal.h>
 #include <fcntl.h>
-#include <getopt.h>
-#include <dirent.h>
-#include <errno.h>
-#include <time.h>
-#include <unistd.h>
-#include <glib.h>
 #include <gmime/gmime.h>
 
 char *read_file(int fd) {
