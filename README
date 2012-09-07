@@ -1,0 +1,28 @@
+warp is a simple program that takes an inn NOV file and transforms it
+into a file more suitable for web display.
+
+When viewing a news group on the web, we want to display the different
+subjects in an efficient manner.  In addition, we want to be able to
+display the contents of each thread separately.
+
+So warp generates two indices and a data area into a single file.
+
+The data area contains sequential data about thread roots -- the
+subject, the author, the date, and the article numbers of the articles
+in the thread.
+
+The first index has a mapping from article numbers to the data area
+position that has data for that article.  This is used for displaying
+the complete contents of a thread.
+
+The second index has a mapping from a "page number" to the first
+article on that "page" in the data area.  This means that if the web
+user wants to see "page five" of the newsgroup (where each page
+contains, say, 30 thread roots), the web interface just has to go to
+index position five in this file, and then seek to the start position
+in the data section.  And then output sequentially the 30 data sets
+found there.
+
+So each web query should entail, at most, one file open, and two file
+seeks.  With a fast disk system, such as a modern SSD, this should
+scale well enough.
