@@ -179,7 +179,9 @@ int data_size() {
     size += strlen(art->from) +
       strlen(art->subject) +
       2 +
-      sizeof(art->time);
+      sizeof(art->time) +
+      // We need a terminator to end the list of articles.
+      sizeof(int);
     a = art;
     // We need to store all the article numbers for the thread.
     do {
@@ -236,6 +238,9 @@ void write_data(int output) {
       data += sizeof(a->number);
       a = a->next_article;
     } while (a);
+    // Zero-terminate the list of articles.
+    *((int*)data) = 0;
+    data += sizeof(int);
 
     art = art->prev_root;
   }
