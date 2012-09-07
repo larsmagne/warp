@@ -18,11 +18,12 @@ struct article {
   int time;
   struct article *next_article;
   struct article *next_root;
+  struct article *prev_root;
   int offset;
 };
 
 article *first_root = NULL;
-article *next_root = NULL;
+article *last_root = NULL;
 int last_article = 0;
 int number_of_roots = 0;
 
@@ -116,6 +117,16 @@ char *thread_line(char *buffer) {
     return buffer;
   }
 
+  art->number = number;
+  art->subject = subject;
+  art->from = from;
+  art->time = time;
+  art->message_id = message_id;
+
+  last_article = number;
+  
+  // See if we can find a parent message by looking at the References
+  // header.  Start at the end and work towards the beginning.
   ref = references + strlen(references);
   while (ref > references) {
     while (ref > references &&
@@ -126,14 +137,6 @@ char *thread_line(char *buffer) {
     parent = (article*)g_hash_table_lookup(message_id_table, ref);
   }
 
-  art->number = number;
-  art->subject = subject;
-  art->from = from;
-  art->time = time;
-  art->message_id = message_id;
-
-  last_article = number;
-  
   if (! parent)
     parent = (article*)g_hash_table_lookup(subject_table, subject);
 
@@ -142,10 +145,11 @@ char *thread_line(char *buffer) {
     g_hash_table_insert(message_id_table, message_id, (gpointer)art);
     if (! first_root)
       first_root = art;
-    else
-      next_root->next_root = art;
-      next_root = art;
-    next_root = art;
+    else {
+      art->prev_root = last_root;
+      last_root->next_root = art;
+    }
+    last_root = art;
     number_of_roots++;
   } else {
     // If there is a parent, then just add this one to the last entry
@@ -166,7 +170,7 @@ void thread_file(int nov, int output) {
 }
 
 int data_size() {
-  article *art = first_root, *a;
+  article *art = last_root, *a;
   int size = 0;
   
   while (art) {
@@ -182,7 +186,8 @@ int data_size() {
       size += sizeof(int);
       a = a->next_article;
     } while (a);
-    art = art->next_root;
+
+    art = art->prev_root;
   }
 
   return size;
@@ -192,12 +197,13 @@ void write_data(int output) {
   int index_size = sizeof(int) * (2 + last_article +
 				  number_of_roots / ROOTS_PER_PAGE);
   int total_size = index_size + data_size();
-  int *index = calloc(total_size, 1);
-  article *art = first_root;
+  char *index = calloc(total_size, 1);
+  article *art = first_root, *a;
   int i, j;
+  char *offset;
 
-  *index = number_of_roots;
-  *(index + 1) = last_article;
+  *((int*)index) = number_of_roots;
+  *((int*)index + 1) = last_article;
 
   // Write the index that maps from article numbers to thread roots.
   for (i = 0; i < last_article; i++) {
@@ -208,11 +214,28 @@ void write_data(int output) {
   }
 
   // Write the index that maps from overview page to thread roots.
-  art = first_root;
+  art = last_root;
   for (i = 0; i < number_of_roots / ROOTS_PER_PAGE; i++) {
     *(index + 2 + last_article + i) = index_size + art->offset;
     for (j = 0; j < ROOTS_PER_PAGE && art; j++) 
-      art = art->next_root;
+      art = art->prev_root;
+  }
+
+  art = last_root;
+  offset = index + index_size;
+  
+  while (art) {
+    offset += sprintf(offset, "%s\n%s\n", art->from, art->subject);
+    *((time_t*)offset) = art->time;
+    offset += sizeof(time_t);
+    a = art;
+    // We need to store all the article numbers for the thread.
+    do {
+      *((int*)offset) = a->number;
+      a = a->next_article;
+    } while (a);
+
+    art = art->prev_root;
   }
 
   if (write(output, index, total_size) < total_size) {
