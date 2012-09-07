@@ -200,7 +200,7 @@ void write_data(int output) {
   char *index = calloc(total_size, 1);
   article *art = first_root, *a;
   int i, j;
-  char *offset;
+  char *data;
 
   *((int*)index) = number_of_roots;
   *((int*)index + 1) = last_article;
@@ -208,7 +208,7 @@ void write_data(int output) {
   // Write the index that maps from article numbers to thread roots.
   for (i = 0; i < last_article; i++) {
     if (art->number == i) {
-      *(index + 2 + i) = index_size + art->offset;
+      *((int*)index + 2 + i) = index_size + art->offset;
       art = art->next_root;
     }
   }
@@ -216,23 +216,24 @@ void write_data(int output) {
   // Write the index that maps from overview page to thread roots.
   art = last_root;
   for (i = 0; i < number_of_roots / ROOTS_PER_PAGE; i++) {
-    *(index + 2 + last_article + i) = index_size + art->offset;
+    *((int*)index + 2 + last_article + i) = index_size + art->offset;
     for (j = 0; j < ROOTS_PER_PAGE && art; j++) 
       art = art->prev_root;
   }
 
   // Write the data portion.
   art = last_root;
-  offset = index + index_size;
-  
+  data = index + index_size;
+
   while (art) {
-    offset += sprintf(offset, "%s\n%s\n", art->from, art->subject);
-    *((time_t*)offset) = art->time;
-    offset += sizeof(time_t);
+    data += sprintf(data, "%s\n%s\n", art->from, art->subject);
+    *((time_t*)data) = art->time;
+    data += sizeof(art->time);
     a = art;
     // We need to store all the article numbers for the thread.
     do {
-      *((int*)offset) = a->number;
+      *((int*)data) = a->number;
+      data += sizeof(a->number);
       a = a->next_article;
     } while (a);
 
