@@ -197,8 +197,9 @@ int data_size() {
 
 void write_data(int output) {
   int index_size = sizeof(int) * (2 + last_article +
-				  number_of_roots / ROOTS_PER_PAGE);
-  int total_size = index_size + data_size();
+				  number_of_roots / ROOTS_PER_PAGE + 2);
+  int d_size = data_size();
+  int total_size = index_size + d_size;
   char *index = calloc(total_size, 1);
   article *art = first_root, *a;
   int i, j;
@@ -222,6 +223,7 @@ void write_data(int output) {
     for (j = 0; j < ROOTS_PER_PAGE && art; j++) 
       art = art->prev_root;
   }
+  *((int*)index + 2 + last_article + i + 1) = d_size;
 
   // Write the data portion.
   art = last_root;
