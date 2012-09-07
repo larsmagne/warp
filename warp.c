@@ -96,7 +96,7 @@ int parse_date(char *date) {
 
 char *thread_line(char *buffer) {
   int number = atoi(read_elem(&buffer));
-  char *subject = clean_subject(read_elem(&buffer));
+  char *subject = clean_subject(g_mime_utils_header_decode_text(read_elem(&buffer)));
   char *from = clean_from(read_elem(&buffer));
   int time = parse_date(read_elem(&buffer));
   char *message_id = read_elem(&buffer);
@@ -221,6 +221,7 @@ void write_data(int output) {
       art = art->prev_root;
   }
 
+  // Write the data portion.
   art = last_root;
   offset = index + index_size;
   
