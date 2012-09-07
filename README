@@ -1,5 +1,8 @@
-warp is a simple program that takes an inn NOV file and transforms it
-into a file more suitable for web display.
+warp is part of a suite of programs used by Gwene to provide a web
+interface to the news spool.
+
+It takes an inn NOV file and transforms it into a file more suitable
+for web display.
 
 When viewing a news group on the web, we want to display the different
 subjects in an efficient manner.  In addition, we want to be able to
