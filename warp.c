@@ -144,7 +144,7 @@ char *thread_line(char *buffer) {
     if (! parent) {
       // Skip past "Re:"
       subject += 3;
-      while (*subject && *subject == ' ')
+      while (*subject == ' ')
 	subject++;
       parent = (article*)g_hash_table_lookup(subject_table, subject);
     }
