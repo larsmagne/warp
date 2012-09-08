@@ -139,8 +139,16 @@ char *thread_line(char *buffer) {
     parent = (article*)g_hash_table_lookup(message_id_table, ref);
   }
 
-  if (! parent && strcasestr(subject, "re:") == subject)
+  if (! parent && strcasestr(subject, "re:") == subject) {
     parent = (article*)g_hash_table_lookup(subject_table, subject);
+    if (! parent) {
+      // Skip past "Re:"
+      subject += 3;
+      while (*subject && *subject == ' ')
+	subject++;
+      parent = (article*)g_hash_table_lookup(subject_table, subject);
+    }
+  }
 
   if (! parent) {
     g_hash_table_insert(subject_table, subject, (gpointer)art);
