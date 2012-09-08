@@ -22,6 +22,8 @@ struct article {
   int offset;
 };
 
+char *strcasestr(const char *haystack, const char *needle);
+
 article *first_root = NULL;
 article *last_root = NULL;
 int last_article = 0;
@@ -137,7 +139,7 @@ char *thread_line(char *buffer) {
     parent = (article*)g_hash_table_lookup(message_id_table, ref);
   }
 
-  if (! parent)
+  if (! parent && strcasestr(subject, "re:") == subject)
     parent = (article*)g_hash_table_lookup(subject_table, subject);
 
   if (! parent) {
