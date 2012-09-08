@@ -15,7 +15,7 @@ struct article {
   char *subject;
   char *message_id;
   int number;
-  int time;
+  time_t time;
   struct article *next_article;
   struct article *next_root;
   struct article *prev_root;
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
   }
 
   output_name = argv[2];
-  tmp_name = malloc(strlen(output_name) + 4);
+  tmp_name = malloc(strlen(output_name) + 5);
   strcpy(tmp_name, output_name);
   strcat(tmp_name, ".tmp");
 
