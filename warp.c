@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <gmime/gmime.h>
 
 #define ROOTS_PER_PAGE 30
@@ -86,7 +87,7 @@ char *clean_from(char *from) {
   if ((iaddr_list = internet_address_list_parse_string(from)) != NULL) {
     iaddr = internet_address_list_get_address(iaddr_list, 0);
     if (iaddr->name != NULL)
-      strcpy(from, iaddr->name);
+      strcpy(from, g_mime_utils_header_decode_text(iaddr->name));
     g_object_unref(iaddr_list);
   }
   return from;
@@ -209,6 +210,7 @@ void write_data(int output) {
   int index_size = sizeof(int) * (2 + last_article +
 				  number_of_roots / ROOTS_PER_PAGE + 2);
   int d_size = data_size();
+  int pages;
   int total_size = index_size + d_size;
   char *index = calloc(total_size, 1);
   article *art = first_root, *a;
@@ -228,12 +230,16 @@ void write_data(int output) {
 
   // Write the index that maps from overview page to thread roots.
   art = last_root;
-  for (i = 0; i < number_of_roots / ROOTS_PER_PAGE; i++) {
+  if (number_of_roots / ROOTS_PER_PAGE * ROOTS_PER_PAGE == number_of_roots)
+    pages = number_of_roots / ROOTS_PER_PAGE;
+  else
+    pages = number_of_roots / ROOTS_PER_PAGE + 1;
+  for (i = 0; i < pages; i++) {
     *((int*)index + 2 + last_article + i) = index_size + art->offset;
     for (j = 0; j < ROOTS_PER_PAGE && art; j++) 
       art = art->prev_root;
   }
-  *((int*)index + 2 + last_article + i + 1) = d_size;
+  *((int*)index + 2 + last_article + i) = total_size;
 
   // Write the data portion.
   art = last_root;
@@ -268,7 +274,7 @@ int main(int argc, char **argv) {
   char *output_name, *tmp_name;
 
   g_type_init();
-  g_mime_init(0);
+  g_mime_init(GMIME_ENABLE_RFC2047_WORKAROUNDS);
   
   if (argc != 3) {
     printf("Usage: warp <nov-file> <output-file>\n");
