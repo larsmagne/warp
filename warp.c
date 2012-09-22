@@ -221,7 +221,7 @@ void write_data(int output) {
   *((int*)index + 1) = last_article;
 
   // Write the index that maps from article numbers to thread roots.
-  for (i = 0; i < last_article; i++) {
+  for (i = 0; i < last_article && art; i++) {
     if (art->number == i) {
       *((int*)index + 2 + i) = index_size + art->offset;
       art = art->next_root;
