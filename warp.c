@@ -273,7 +273,6 @@ int main(int argc, char **argv) {
   int nov, output;
   char *output_name, *tmp_name;
 
-  g_type_init();
   g_mime_init(GMIME_ENABLE_RFC2047_WORKAROUNDS);
   
   if (argc != 3) {
